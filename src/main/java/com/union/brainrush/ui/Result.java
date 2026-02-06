@@ -94,9 +94,9 @@ public class Result {
 		// --- HOME BUTTON ---
 		homeButton = new Button();
 		ImageView homeImage = new ImageView(new Image("images/home/home.png"));
-		homeButton.setGraphic(homeImage);
 		homeImage.setFitWidth(50);
 		homeImage.setFitHeight(50);
+		homeButton.setGraphic(homeImage);
 		homeButton.getStyleClass().add("bottom_format");
 		homeButton.setOnAction(e -> {
 			soundService.playSfx("click");
@@ -142,7 +142,7 @@ public class Result {
 				int finalScore = Player.fPlayerMark;
 
 				// 1. Animation Loop
-				for (int i = 0; i <= finalScore * 10; i++) {
+				for (int i = 0; i <= playerManager.getMark() * 10; i++) {
 					updateProgress(i, 100);
 					final String currentText = String.valueOf(i / 10);
 					final int frameIndex = (i / 5) % 3;
@@ -156,12 +156,12 @@ public class Result {
 				}
 
 				// 2. Database Update (Persistent)
-				playerManager.updateMark(finalScore);
+				// 2. Database Update (Persistent)
 
 				// 3. UI Finalization
 				Platform.runLater(() -> {
 					labelText(fLabel);
-					fLabel.setText(calculateFeedback(finalScore));
+					fLabel.setText(calculateFeedback(playerManager.getMark()));
 					fImageSlot.getChildren().clear();
 					fImageSlot.getChildren().add(new ImageView(new Image("images/result/eaistein.png")));
 				});

@@ -53,3 +53,19 @@
 .answer, .ABC {
     -fx-mouse-transparent: true;
 }
+
+.timer-label {
+    -fx-text-fill: white;
+    -fx-font-family: "Arial";
+    -fx-font-weight: bold;
+    -fx-font-size: 32px;
+    -fx-background-color: rgba(0, 0, 0, 0.6); /* Dark semi-transparent */
+    -fx-background-radius: 50; /* Makes it circular/pill shaped */
+    -fx-border-color: rgba(255, 255, 255, 0.8);
+    -fx-border-radius: 50;
+    -fx-border-width: 2px;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 10, 0, 0, 5);
+    -fx-padding: 5 20 5 20; /* Top Right Bottom Left */
+    -fx-alignment: center;
+}
+

@@ -6,6 +6,8 @@ import com.union.brainrush.service.Player;
 import com.union.brainrush.service.PlayerManager;
 import com.union.brainrush.service.QuestionService;
 import com.union.brainrush.service.SoundService;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -16,9 +18,11 @@ import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
+import javafx.util.Duration;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -32,8 +36,10 @@ import java.util.regex.Pattern;
 @Component
 @Lazy
 public class Question {
+	// Game Settings
 	public static int questionPointer = 0;
 	public static int totalQuestion = 10;
+	private final int TIME_LIMIT = 7; // 5 Seconds Timer
 
 	private Scene scene;
 	public static StackPane root;
@@ -42,6 +48,7 @@ public class Question {
 			"#f7c89f", "#4b6240", "#d48e38", "#623f31", "#684f9b"
 	));
 
+	// UI Components
 	private StackPane questionPane, answerPane, qUpperLayout, qBottomLayout;
 	public static Button actionButton;
 	private Button homeButton;
@@ -49,56 +56,82 @@ public class Question {
 	private VBox answersVBox;
 	private TextFlow textFlow;
 
+	// Timer Components
+	private Label timerLabel;
+	private Timeline questionTimer;
+
+	// Fonts
 	private final Font burmeseFont = Font.loadFont(getClass().getResourceAsStream(UiConstant.NOTO_REGULAR_PATH), 24);
 	private final Font englishFont = Font.font("Arial", 22);
 
+	// Services & Data
 	private final QuestionService questionService;
 	private List<QuestionFormat> questionArray;
 	private QuestionFormat currentQuestion;
 
 	@Autowired @Lazy TransitionState transitionState;
 	@Autowired SceneManager sceneManager;
+	@Autowired private PlayerManager playerManager;
+	@Autowired private SoundService soundService;
 
-	@Autowired
-	private PlayerManager playerManager;
-	@Autowired
-	private SoundService soundService;
+	public static ImageView[] playerSlot = new ImageView[3];
+
 	@Autowired
 	public Question(QuestionService questionService) {
 		this.questionService = questionService;
 	}
 
-	public void questionState(boolean shuffle, double width, double height) {
-		// Data Initialization
-		this.questionArray = questionService.getRandomRound(totalQuestion);
+	/**
+	 * Initializes or Updates the Question Scene
+	 */
+	public void questionState(boolean startNewGame, double width, double height) {
+		// 1. Reset answer at the start of every question to detect timeouts later
+		Player.fPlayerAns = "";
 
-		if (questionArray.isEmpty()) {
-			System.err.println("No questions found in database!");
-			return;
-		}
+		// 2. Data Initialization (Only fetch if starting new game)
+		if (startNewGame || questionArray == null || questionArray.isEmpty()) {
+			this.questionArray = questionService.getRandomRound(totalQuestion);
 
-		if (shuffle) {
+			if (questionArray.isEmpty()) {
+				System.err.println("No questions found in database!");
+				return;
+			}
 			Collections.shuffle(questionArray);
 			Collections.shuffle(bgColor);
+			questionPointer = 0;
+		}
+
+		// 3. Safety Check: If out of bounds, go to result
+		if (questionPointer >= questionArray.size()) {
+			sceneManager.switchToResult();
+			return;
 		}
 
 		currentQuestion = questionArray.get(questionPointer);
 		root = new StackPane();
 		HBox mainLayout = new HBox();
 
-		// UI Components
+		// 4. UI Layout Setup
 		questionPane = new StackPane();
 		qUpperLayout = new StackPane();
 		qBottomLayout = new StackPane();
 
 		homeButton = new Button();
 		ImageView homeImage = new ImageView(new Image("images/home/home.png"));
-		homeButton.setGraphic(homeImage);
 		homeImage.setFitWidth(50);
 		homeImage.setFitHeight(50);
+		homeButton.setGraphic(homeImage);
 		homeButton.getStyleClass().add("bottom_format");
 		homeButton.setOnAction(e -> switchBackToHome());
 
+		// --- TIMER LABEL SETUP ---
+		timerLabel = new Label(String.valueOf(TIME_LIMIT));
+		timerLabel.getStyleClass().add("timer-label"); // CSS styling
+		StackPane.setAlignment(timerLabel, Pos.TOP_CENTER);
+		StackPane.setMargin(timerLabel, new Insets(100,0,0,0));
+		// ------------------------
+
+		// Player Icons
 		playerHBox = new HBox(15);
 		playerHBox.setAlignment(Pos.CENTER);
 		for (int i = 0; i < Player.playerQuantity; i++) {
@@ -107,14 +140,15 @@ public class Question {
 			pv.setFitWidth(60);
 			pv.setPreserveRatio(true);
 			playerHBox.getChildren().add(pv);
-			// Store references in the array for the checkPlayerMark logic
 			playerSlot[i] = pv;
 		}
 
 		actionButton = new Button("Next");
 		actionButton.setVisible(false);
 		actionButton.setOnAction(e -> nextQuestion());
-		qUpperLayout.getChildren().addAll(playerHBox, actionButton);
+
+		// Add Timer to Layout
+		qUpperLayout.getChildren().addAll(playerHBox, actionButton, timerLabel);
 
 		Player.rightAns = currentQuestion.getRightAns();
 		textFlow = createTextFlow(currentQuestion.getQuestion());
@@ -126,7 +160,7 @@ public class Question {
 
 		questionPane.getChildren().addAll(qUpperLayout, qBottomLayout);
 
-		// RIGHT SIDE: Answer Rows as Clickable Buttons
+		// Answer Buttons
 		answerPane = new StackPane();
 		answersVBox = new VBox(25);
 		answersVBox.setAlignment(Pos.CENTER_LEFT);
@@ -136,7 +170,7 @@ public class Question {
 		for (String key : keys) {
 			HBox row = new HBox(20);
 			row.setAlignment(Pos.CENTER_LEFT);
-			row.getStyleClass().add("answer_row"); // For hover styling in CSS
+			row.getStyleClass().add("answer_row");
 			row.setCursor(javafx.scene.Cursor.HAND);
 
 			Label circleLabel = new Label(key);
@@ -152,7 +186,6 @@ public class Question {
 
 			row.getChildren().addAll(circleLabel, ansText);
 
-			// MOUSE CLICK LOGIC (Replaces Serial Service)
 			row.setOnMouseClicked(event -> {
 				handleAnswerSelection(key);
 			});
@@ -170,22 +203,97 @@ public class Question {
 		applyBindings();
 		scene.getStylesheets().add("css/style.css");
 		positionPane();
+
+		// 5. Start the countdown
+		startTimer();
 	}
 
-	private void handleAnswerSelection(String choice) {
-		// Assign choice to player 1 (assuming 1-player mode for clicks)
-		Player.fPlayerAns = choice;
+	// --- TIMER LOGIC ---
+	private void startTimer() {
+		if (questionTimer != null) questionTimer.stop();
 
-		// Update UI feedback (Changing player icon to confirm state)
+		final int[] timeSeconds = {TIME_LIMIT};
+		timerLabel.setText(String.valueOf(timeSeconds[0]));
+
+		questionTimer = new Timeline(new KeyFrame(Duration.seconds(1), event -> {
+			timeSeconds[0]--;
+			timerLabel.setText(String.valueOf(timeSeconds[0]));
+
+			if (timeSeconds[0] <= 0) {
+				questionTimer.stop();
+				handleTimeout();
+			}
+		}));
+		questionTimer.setCycleCount(TIME_LIMIT);
+		questionTimer.play();
+	}
+
+	private void handleTimeout() {
+		// Disable UI
+		if(answersVBox != null) answersVBox.setDisable(true);
+		// Ensure answer is empty (Timeout indicator)
+		Player.fPlayerAns = "";
+		// Move next
+		actionButton.fire();
+	}
+	// -------------------
+
+	private void handleAnswerSelection(String choice) {
+		// Stop timer on click
+		if (questionTimer != null) questionTimer.stop();
+
+		Player.fPlayerAns = choice;
 		if (playerSlot[0] != null) {
 			playerSlot[0].setImage(UiConstant.firstPlayerConfirm);
 		}
-
-		// Disable further clicks to prevent double-firing
 		answersVBox.setDisable(true);
-
-		// Trigger next question (mimicking the actionButton.fire() from serial)
 		actionButton.fire();
+	}
+
+	public void nextQuestion() {
+		questionPointer++;
+
+		// GAME OVER CHECK
+		if (questionPointer >= totalQuestion || questionPointer >= questionArray.size()) {
+			if (Player.rightAns.equalsIgnoreCase(Player.fPlayerAns)) {
+				soundService.playSfx("correct");
+				playerManager.updateMark(playerManager.getMark()+1);
+			} else {
+				soundService.playSfx("wrong");
+			}
+			this.questionArray = null; // Clear list for next game
+			sceneManager.switchToResult();
+		} else {
+			// NEXT QUESTION CHECK
+			if (Player.rightAns.equalsIgnoreCase(Player.fPlayerAns)) {
+				// Correct Answer
+				soundService.playSfx("correct");
+				Player.fPlayerMark++;
+				playerManager.updateMark(playerManager.getMark()+1);
+				transitionState.showTransitionState("မှန်ကန်ပါတယ်!", root, false, true);
+			} else {
+				// Wrong Answer logic
+				soundService.playSfx("wrong");
+
+				// Check if it was a timeout (Answer is empty)
+				if (Player.fPlayerAns == null || Player.fPlayerAns.isEmpty()) {
+					transitionState.showTransitionState("အချိန်ကုန်သွားပါပြီ!", root, false, false);
+				} else {
+					transitionState.showTransitionState("မှားယွင်းနေပါတယ်!", root, false, false);
+				}
+			}
+		}
+	}
+
+	private void switchBackToHome() {
+		if (questionTimer != null) questionTimer.stop(); // Important: Stop timer
+
+		soundService.playSfx("click");
+		playerManager.abandonSession();
+		questionPointer = 0;
+		this.questionArray = null;
+		Player.resetPlayerMark();
+		sceneManager.switchToHome(true);
 	}
 
 	private void applyBindings() {
@@ -216,42 +324,5 @@ public class Question {
 		return flow;
 	}
 
-	public void nextQuestion() {
-		questionPointer++;
-		if (questionPointer >= totalQuestion || questionPointer >= questionArray.size()) {
-			if (Player.rightAns.equalsIgnoreCase(Player.fPlayerAns)) {
-				soundService.playSfx("correct");
-			}else{
-				soundService.playSfx("wrong");
-			}
-			sceneManager.switchToResult();
-		} else {
-			if (Player.rightAns.equalsIgnoreCase(Player.fPlayerAns)) {
-				soundService.playSfx("correct");
-				Player.fPlayerMark++; // Reward player
-				transitionState.showTransitionState("မှန်ကန်ပါတယ်!", root, false, true);
-			} else {
-				soundService.playSfx("wrong");
-				transitionState.showTransitionState("မှားယွင်းနေပါတယ်!", root, false, false);
-			}
-		}
-	}
-
-	private void checkPlayerMark() {
-		// Logic based on your old mark tracking
-		if (Player.rightAns.equalsIgnoreCase(Player.fPlayerAns)) Player.fPlayerMark++;
-		if (Player.rightAns.equalsIgnoreCase(Player.sPlayerAns)) Player.sPlayerMark++;
-		if (Player.rightAns.equalsIgnoreCase(Player.tPlayerAns)) Player.tPlayerMark++;
-	}
-
-	private void switchBackToHome() {
-		soundService.playSfx("click");
-		playerManager.abandonSession();
-		sceneManager.switchToHome(true);
-		questionPointer = 0;
-		Player.resetPlayerMark();
-	}
-
-	public static ImageView[] playerSlot = new ImageView[3];
 	public Scene getScene() { return scene; }
 }

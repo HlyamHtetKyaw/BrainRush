@@ -23,7 +23,12 @@ public class PlayerManager {
             repository.save(currentPlayer);
         }
     }
-
+    public int getMark(){
+        if (currentPlayer != null) {
+            return currentPlayer.getMark();
+        }
+        return 0;
+    }
     public void abandonSession() {
         if (currentPlayer != null) {
             repository.deleteByUuid(currentPlayer.getUuid());
