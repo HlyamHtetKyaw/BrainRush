@@ -1,7 +1,8 @@
 package com.union.brainrush.ui;
 
+import com.union.brainrush.service.PlayerManager;
+import com.union.brainrush.service.SoundService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
@@ -66,7 +67,16 @@ public class Home {
 	@Autowired
 	@Lazy
 	Setting settingWindow;
-	
+
+	@Autowired
+	private PlayerManager playerManager;
+
+	@Autowired
+	private ManagementHub managementHub;
+
+	@Autowired
+	private SoundService soundService;
+
 	PortCommunication pc = new PortCommunication();
 	
 	@Autowired
@@ -80,6 +90,7 @@ public class Home {
 
 		// Buttons Action
 		firstPlayerButton.setOnAction(e -> {
+			soundService.playSfx("click");
 			buttonsAction(1);
 		});
 		secondPlayerButton.setOnAction(e -> {
@@ -129,7 +140,7 @@ public class Home {
 		imagelayout.getChildren().add(titleImage);
 
 		// Create second slot (Label)
-		label = new Label("ဘယ်နှစ်ယောက်ကစားမှာလဲ..?");
+		label = new Label("ကစားဖို့အသင့်ပဲလား...?");
 		label_small_font = Font.loadFont(getClass().getResourceAsStream(UiConstant.NOTO_REGULAR_PATH), 25);
 		label.setFont(label_small_font);
 		label.setStyle("-fx-alignment: center;");
@@ -142,10 +153,11 @@ public class Home {
 		stackpane3 = new StackPane();
 
 		// 3 Buttons
-		firstPlayerButton = new Button("တစ်ယောက်");
+		firstPlayerButton = new Button("စတင်မယ်");
 		secondPlayerButton = new Button("နှစ်ယောက်");
 		thirdPlayerButton = new Button("သုံးယောက်");
-
+		secondPlayerButton.setDisable(true);
+		thirdPlayerButton.setDisable(true);
 		// Font for buttons
 		button_small_font = Font.loadFont(getClass().getResourceAsStream(UiConstant.NOTO_REGULAR_PATH), 19);
 
@@ -155,8 +167,8 @@ public class Home {
 		thirdPlayerButton.setStyle("-fx-background-color:#34724a");
 
 		// Looping array
-		StackPane[] stackpanes = { stackpane1, stackpane2, stackpane3 };
-		Button[] buttons = { firstPlayerButton, secondPlayerButton, thirdPlayerButton };
+		StackPane[] stackpanes = { stackpane1};
+		Button[] buttons = { firstPlayerButton};
 
 		int index = 0;
 		for (StackPane stackpane : stackpanes) {
@@ -202,7 +214,8 @@ public class Home {
 		buttonImage.setFitWidth(50);
 		buttonImage.setFitHeight(50);
 		setting.setOnAction(e->{
-			settingWindow.showSetting(root);
+			soundService.playSfx("click");
+			managementHub.show(root);
 		});
 		setting.setGraphic(buttonImage);
 		setting.setMaxSize(50, 50);
@@ -223,6 +236,7 @@ public class Home {
 	}
 	private void buttonsAction(int mode) {
 		Player.playerQuantity = mode;
+		playerManager.startNewSession();
 		if(mode==1) {
 			Player.sentMessage="PC:{choice:True1}";
 		}
@@ -232,7 +246,7 @@ public class Home {
 		if(mode==3) {
 			Player.sentMessage="PC:{choice:True3}";
 		}
-	    transitionState.showTransitionState("အဆင်သင့်ပြင်ထားနော်",root,true);
+	    transitionState.showTransitionState("အဆင်သင့်ပြင်ထားနော်",root,true,true);
 	}
 
 	private void responsive() {

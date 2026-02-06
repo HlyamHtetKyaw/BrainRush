@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 
 import com.union.brainrush.routing.SceneManager;
 import com.union.brainrush.service.Player;
-import com.union.brainrush.service.SerialService;
 
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -25,29 +24,19 @@ import javafx.util.Duration;
 @Component
 @Lazy
 public class TransitionState {
-	// Root Pane
 	private StackPane overlayPane;
-
-	// VBox for three children
 	private VBox vBox;
-
-	// Three layout for vBox
-	private StackPane upperLayout;
-	private StackPane middleLayout;
-	private StackPane underLayout;
-
-	// Upper child
+	private StackPane upperLayout, middleLayout, underLayout;
 	private HBox hBox;
 
-	// Player slot
-	private ImageView[] playerSlot = { UiConstant.fpV, UiConstant.spV, UiConstant.tpV };
-	// Counter
+	// Player slots referencing the views in UiConstant
+	private ImageView[] playerViews = { UiConstant.fpV, UiConstant.spV, UiConstant.tpV };
+
 	private Label counter;
 	private Font counter_small_font;
 	private Timeline timeline;
 	private int remain_counter;
 
-	// Under child
 	private Label announcedLabel;
 	private Font label_small_font;
 
@@ -57,34 +46,45 @@ public class TransitionState {
 	@Autowired
 	private Question questionState;
 
-	public void showTransitionState(String announcedString, StackPane root, boolean question) {
+	/**
+	 * @param announcedString The text to display (e.g., "Correct!" or "Wrong!")
+	 * @param root The parent StackPane to attach the overlay to
+	 * @param isNewRound Whether to initialize a new set of questions
+	 * @param isCorrect Whether the player got the answer right (for image swapping)
+	 */
+	public void showTransitionState(String announcedString, StackPane root, boolean isNewRound, boolean isCorrect) {
 		remain_counter = 1;
-		// Set the VBox's height ratios
-		double[] proportions = { 0.325, 0.35, 0.325 };
 
-		// Create VBox
 		vBox = new VBox();
-
 		upperLayout = new StackPane();
-
 		middleLayout = new StackPane();
-
 		underLayout = new StackPane();
 
-		// VBox for upperLayout
+		// --- DYNAMIC IMAGE LOGIC ---
+		if (isCorrect) {
+			UiConstant.fpV.setImage(UiConstant.firstPlayerConfirm);
+			UiConstant.spV.setImage(UiConstant.secondPlayerConfirm);
+			UiConstant.tpV.setImage(UiConstant.thirdPlayerConfirm);
+		} else {
+			UiConstant.fpV.setImage(UiConstant.firstPlayer);
+			UiConstant.spV.setImage(UiConstant.secondPlayer);
+			UiConstant.tpV.setImage(UiConstant.thirdPlayer);
+		}
+
 		hBox = new HBox();
+		hBox.setSpacing(20);
 		hBox.setAlignment(Pos.BOTTOM_CENTER);
 		for (int i = 0; i < Player.playerQuantity; i++) {
-			hBox.getChildren().add(playerSlot[i]);
+			hBox.getChildren().add(playerViews[i]);
 		}
-		StackPane.setAlignment(hBox, Pos.BOTTOM_CENTER);
 		upperLayout.getChildren().add(hBox);
-		// Counter label
+
+		// Counter Setup
 		counter = new Label("၃");
 		counter_small_font = Font.loadFont(getClass().getResourceAsStream(UiConstant.NOTO_REGULAR_PATH), 40);
 		counter.setFont(counter_small_font);
 		counter.setAlignment(Pos.CENTER);
-		counter.setStyle("-fx-background-color: white;-fx-background-radius:50%;");
+		counter.setStyle("-fx-background-color: white; -fx-background-radius: 100;"); // Circle
 		counter.setMaxSize(200, 200);
 
 		// Countdown logic
@@ -93,15 +93,13 @@ public class TransitionState {
 			if (remain_counter == -1) {
 				UiConstant.WIDTH = (int) overlayPane.getWidth();
 				UiConstant.HEIGHT = (int) overlayPane.getHeight();
-				if (question) {
-					SerialService.running = true;
-					questionState.questionState(true,overlayPane.getWidth(),overlayPane.getHeight());
-					sceneManager.switchToQuestion();
-				} else {
-					SerialService.running = true;
-					questionState.questionState(false,overlayPane.getWidth(),overlayPane.getHeight());
-					sceneManager.switchToQuestion();
-				}
+
+				// Initialize next state
+				questionState.questionState(isNewRound, overlayPane.getWidth(), overlayPane.getHeight());
+				sceneManager.switchToQuestion();
+
+				// Remove overlay before leaving
+				root.getChildren().remove(overlayPane);
 			} else {
 				counter.setText(counterText[remain_counter]);
 				remain_counter--;
@@ -112,54 +110,43 @@ public class TransitionState {
 		middleLayout.getChildren().add(counter);
 
 		// Announced Text
-		announcedLabel = new Label();
-		announcedLabel.setText(announcedString);
+		announcedLabel = new Label(announcedString);
 		announcedLabel.setTextFill(Color.WHITE);
 		label_small_font = Font.loadFont(getClass().getResourceAsStream(UiConstant.NOTO_REGULAR_PATH), 25);
 		announcedLabel.setFont(label_small_font);
 		StackPane.setAlignment(announcedLabel, Pos.TOP_CENTER);
-
 		underLayout.getChildren().add(announcedLabel);
 
+		// Layout bindings
 		vBox.getChildren().addAll(upperLayout, middleLayout, underLayout);
-
-		// Bind the height of each child to the proportions of the VBox
-		// Bind heights to proportions
+		double[] proportions = { 0.325, 0.35, 0.325 };
 		for (int i = 0; i < vBox.getChildren().size(); i++) {
-			if (vBox.getChildren().get(i) instanceof Region) { // Only bind for nodes that are Regions
+			if (vBox.getChildren().get(i) instanceof Region) {
 				((Region) vBox.getChildren().get(i)).prefHeightProperty()
 						.bind(vBox.heightProperty().multiply(proportions[i]));
 			}
 		}
 
-		// Overlay StackPane
 		overlayPane = new StackPane();
-
-		// Setting background black transparent
 		overlayPane.setBackground(Background.fill(Color.rgb(0, 0, 0, 0.8)));
-
 		overlayPane.getChildren().add(vBox);
 		vBox.maxWidthProperty().bind(overlayPane.widthProperty().divide(3));
+
 		root.getChildren().add(overlayPane);
 		responsive();
 	}
 
 	private void responsive() {
-		overlayPane.widthProperty().addListener((observable, oldValue, newValue) -> {
-			double width = newValue.doubleValue();
-
-			if (width > 1024 && width <= 1440) {
-				// Medium Screen
-			} else if (width > 1440) {
-				// Large Screen
+		overlayPane.widthProperty().addListener((obs, oldVal, newVal) -> {
+			double width = newVal.doubleValue();
+			if (width > 1440) {
 				label_small_font = Font.loadFont(getClass().getResourceAsStream(UiConstant.NOTO_REGULAR_PATH), 30);
 				announcedLabel.setFont(label_small_font);
-				counter.setMaxSize(300, 300);
+				counter.setScaleX(1.5); counter.setScaleY(1.5);
 			} else {
-				// Small Screen
 				label_small_font = Font.loadFont(getClass().getResourceAsStream(UiConstant.NOTO_REGULAR_PATH), 25);
 				announcedLabel.setFont(label_small_font);
-				counter.setMaxSize(200, 200);
+				counter.setScaleX(1.0); counter.setScaleY(1.0);
 			}
 		});
 	}

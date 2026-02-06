@@ -31,9 +31,9 @@ public class SceneManager {
 	}
 
 	public void switchToHome(boolean check) {
-		if(check) {
-			home.root.getChildren().remove(home.root.getChildren().size() - 1);
-		}
+//		if(check) {
+//			home.root.getChildren().remove(home.root.getChildren().size() - 1);
+//		}
 		stage.setScene(home.getScene());
 	}
 	public void switchToFirst() {
@@ -43,7 +43,7 @@ public class SceneManager {
 		stage.setScene(question.getScene());
 	}
 	public void switchToResult() {
-		stage.setScene(result.getScene());
+		result.initResultState();stage.setScene(result.getScene());
 	}
 }
 

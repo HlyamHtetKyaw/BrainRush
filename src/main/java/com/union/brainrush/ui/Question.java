@@ -1,22 +1,11 @@
 package com.union.brainrush.ui;
 
-import java.io.Serial;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.regex.Pattern;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Component;
-
 import com.union.brainrush.model.QuestionFormat;
 import com.union.brainrush.routing.SceneManager;
 import com.union.brainrush.service.Player;
+import com.union.brainrush.service.PlayerManager;
 import com.union.brainrush.service.QuestionService;
-import com.union.brainrush.service.SerialService;
-
+import com.union.brainrush.service.SoundService;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -24,14 +13,21 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.Background;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextFlow;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.regex.Pattern;
 
 @Component
 @Lazy
@@ -39,253 +35,223 @@ public class Question {
 	public static int questionPointer = 0;
 	public static int totalQuestion = 10;
 
-	Scene scene;
+	private Scene scene;
 	public static StackPane root;
-	private String[] backgroundColor = {"#ed801b","#004aad","#ebcd35","#b64747","#3fa278",
-										"#f7c89f","#4b6240","#d48e38","#623f31","#684f9b"};
-	private List<String> bgColor = Arrays.asList(backgroundColor);
-	private StackPane questionPane;
-	private StackPane answerPane;
-	private StackPane qUpperLayout;
-	private StackPane qBottomLayout;
+	private final List<String> bgColor = new ArrayList<>(Arrays.asList(
+			"#ed801b", "#004aad", "#ebcd35", "#b64747", "#3fa278",
+			"#f7c89f", "#4b6240", "#d48e38", "#623f31", "#684f9b"
+	));
 
-	// Button
+	private StackPane questionPane, answerPane, qUpperLayout, qBottomLayout;
 	public static Button actionButton;
-	private ImageView homeImage;
 	private Button homeButton;
-
-	// Player slot hBox
-	private HBox hBox;
-
-	// Player slot
-	public static ImageView[] playerSlot = { UiConstant.fpV, UiConstant.spV, UiConstant.tpV };
-
+	private HBox playerHBox;
+	private VBox answersVBox;
 	private TextFlow textFlow;
 
-	// Buttons slot vBox and stackPane for each
-	private VBox vBox;
-	StackPane stackpane1;
-	StackPane stackpane2;
-	StackPane stackpane3;
+	private final Font burmeseFont = Font.loadFont(getClass().getResourceAsStream(UiConstant.NOTO_REGULAR_PATH), 24);
+	private final Font englishFont = Font.font("Arial", 22);
 
-	// 3 Buttons
-	Button firstPlayerButton;
-	Button secondPlayerButton;
-	Button thirdPlayerButton;
+	private final QuestionService questionService;
+	private List<QuestionFormat> questionArray;
+	private QuestionFormat currentQuestion;
 
-	// Labels A,B,C
-	Label A;
-	Label B;
-	Label C;
-	Font burmeseFont = Font.loadFont(getClass().getResourceAsStream(UiConstant.NOTO_REGULAR_PATH), 20);
-	Font englishFont = Font.font("Arial", 20);
-
-	QuestionService questions;
-	ArrayList<QuestionFormat> questionArray;
-	QuestionFormat question;
+	@Autowired @Lazy TransitionState transitionState;
+	@Autowired SceneManager sceneManager;
 
 	@Autowired
-	@Lazy
-	TransitionState transitionState;
-
+	private PlayerManager playerManager;
 	@Autowired
-	SceneManager sceneManager;
-
-	SerialService serialService;
-
+	private SoundService soundService;
 	@Autowired
-	public Question(QuestionService questions) {
-		this.questions = questions;
+	public Question(QuestionService questionService) {
+		this.questionService = questionService;
 	}
 
-	public void questionState(boolean shuffle,double width,double height) {
-		serialService = new SerialService();
-		serialService.start();
-		questionArray = questions.getQuestions();
-		
+	public void questionState(boolean shuffle, double width, double height) {
+		// Data Initialization
+		this.questionArray = questionService.getRandomRound(totalQuestion);
+
+		if (questionArray.isEmpty()) {
+			System.err.println("No questions found in database!");
+			return;
+		}
+
 		if (shuffle) {
 			Collections.shuffle(questionArray);
 			Collections.shuffle(bgColor);
 		}
 
-		question = questionArray.get(questionPointer);
+		currentQuestion = questionArray.get(questionPointer);
 		root = new StackPane();
+		HBox mainLayout = new HBox();
 
+		// UI Components
 		questionPane = new StackPane();
 		qUpperLayout = new StackPane();
 		qBottomLayout = new StackPane();
 
-		// Button
-		actionButton = new Button();
-		actionButton.setOnAction(e -> {
-			nextQuestion();
-		});
-		actionButton.setVisible(false);
-		StackPane.setAlignment(actionButton, Pos.TOP_LEFT);
-
-		homeImage = new ImageView(new Image("images/home/home.png"));
 		homeButton = new Button();
+		ImageView homeImage = new ImageView(new Image("images/home/home.png"));
 		homeButton.setGraphic(homeImage);
 		homeImage.setFitWidth(50);
 		homeImage.setFitHeight(50);
 		homeButton.getStyleClass().add("bottom_format");
-		homeButton.setOnAction(e -> {
-			switchBackToHome();
-		});
-		StackPane.setAlignment(homeButton, Pos.BOTTOM_LEFT);
-		StackPane.setMargin(homeButton, new Insets(50));
+		homeButton.setOnAction(e -> switchBackToHome());
 
-		// VBox for upperLayout
-		playerSlot[0].setImage(UiConstant.firstPlayer);
-		playerSlot[1].setImage(UiConstant.secondPlayer);
-		playerSlot[2].setImage(UiConstant.thirdPlayer);
-		hBox = new HBox();
+		playerHBox = new HBox(15);
+		playerHBox.setAlignment(Pos.CENTER);
 		for (int i = 0; i < Player.playerQuantity; i++) {
-			hBox.getChildren().add(playerSlot[i]);
+			ImageView pv = new ImageView();
+			pv.setImage(i==0 ? UiConstant.firstPlayer : i==1 ? UiConstant.secondPlayer : UiConstant.thirdPlayer);
+			pv.setFitWidth(60);
+			pv.setPreserveRatio(true);
+			playerHBox.getChildren().add(pv);
+			// Store references in the array for the checkPlayerMark logic
+			playerSlot[i] = pv;
 		}
-		StackPane.setAlignment(hBox, Pos.BOTTOM_CENTER);
-		qUpperLayout.getChildren().addAll(hBox, actionButton);
-		// label.setFont(label_small_font);
-		Player.rightAns = question.getRightAns();
-		String text = question.getQuestion();
-		textFlow = createTextFlow(text);
+
+		actionButton = new Button("Next");
+		actionButton.setVisible(false);
+		actionButton.setOnAction(e -> nextQuestion());
+		qUpperLayout.getChildren().addAll(playerHBox, actionButton);
+
+		Player.rightAns = currentQuestion.getRightAns();
+		textFlow = createTextFlow(currentQuestion.getQuestion());
 		textFlow.getStyleClass().add("question_text_flow");
-		qBottomLayout.getChildren().add(textFlow);
 
-		questionPane.getChildren().addAll(qUpperLayout, qBottomLayout, homeButton);
+		VBox questionCenterer = new VBox(textFlow);
+		questionCenterer.setAlignment(Pos.CENTER);
+		qBottomLayout.getChildren().add(questionCenterer);
 
+		questionPane.getChildren().addAll(qUpperLayout, qBottomLayout);
+
+		// RIGHT SIDE: Answer Rows as Clickable Buttons
 		answerPane = new StackPane();
-		vBox = new VBox(20);
-		// Create third slots (for 3 ans)
-		stackpane1 = new StackPane();
-		stackpane2 = new StackPane();
-		stackpane3 = new StackPane();
+		answersVBox = new VBox(25);
+		answersVBox.setAlignment(Pos.CENTER_LEFT);
+		answersVBox.setPadding(new Insets(0, 0, 0, 30));
 
-		A = new Label("A");
-		B = new Label("B");
-		C = new Label("C");
-		Label[] ABC = { A, B, C };
-		for (Label each : ABC) {
-			each.getStyleClass().add("ABC");
-			each.setFont(englishFont);
-			each.setMaxSize(60, 60);
-			each.setAlignment(Pos.CENTER);
-			StackPane.setAlignment(each, Pos.CENTER_LEFT);
+		String[] keys = {"A", "B", "C"};
+		for (String key : keys) {
+			HBox row = new HBox(20);
+			row.setAlignment(Pos.CENTER_LEFT);
+			row.getStyleClass().add("answer_row"); // For hover styling in CSS
+			row.setCursor(javafx.scene.Cursor.HAND);
+
+			Label circleLabel = new Label(key);
+			circleLabel.getStyleClass().add("ABC");
+			circleLabel.setMinWidth(65);
+			circleLabel.setMinHeight(65);
+			circleLabel.setAlignment(Pos.CENTER);
+
+			TextFlow ansText = createTextFlow(currentQuestion.getAns().getOrDefault(key, ""));
+			ansText.getStyleClass().add("answer");
+			ansText.setMinWidth(280);
+			ansText.setMaxWidth(280);
+
+			row.getChildren().addAll(circleLabel, ansText);
+
+			// MOUSE CLICK LOGIC (Replaces Serial Service)
+			row.setOnMouseClicked(event -> {
+				handleAnswerSelection(key);
+			});
+
+			answersVBox.getChildren().add(row);
 		}
-		String a = question.getAns().get("A");
-		TextFlow ans1 = createTextFlow(a);
-		String b = question.getAns().get("B");
-		TextFlow ans2 = createTextFlow(b);
-		String c = question.getAns().get("C");
-		TextFlow ans3 = createTextFlow(c);
-		TextFlow[] ans = { ans1, ans2, ans3 };
-		for (TextFlow each : ans) {
-			StackPane.setAlignment(each, Pos.CENTER_LEFT);
-			StackPane.setMargin(each, new Insets(0, 0, 0, 80));
-			each.setMaxSize(250, 30);
-			each.getStyleClass().add("answer");
-		}
+		answerPane.getChildren().add(answersVBox);
 
-		stackpane1.getChildren().addAll(A, ans1);
-		stackpane2.getChildren().addAll(B, ans2);
-		stackpane3.getChildren().addAll(C, ans3);
-		vBox.getChildren().addAll(stackpane1, stackpane2, stackpane3);
+		mainLayout.getChildren().addAll(questionPane, answerPane);
+		root.getChildren().addAll(mainLayout, homeButton);
 
-		answerPane.getChildren().add(vBox);
+		root.setStyle("-fx-background-color:" + bgColor.get(questionPointer % bgColor.size()) + ";");
 
-		String styleColor = "-fx-background-color:"+bgColor.get(questionPointer)+";";
-		root.setStyle(styleColor);
-		root.getChildren().addAll(questionPane, answerPane);
-		scene = new Scene(root,width,height);
-		questionPane.maxWidthProperty().bind(scene.widthProperty().multiply(6).divide(10));
-		answerPane.maxWidthProperty().bind(scene.widthProperty().multiply(4).divide(10));
-		qUpperLayout.maxHeightProperty().bind(scene.heightProperty().multiply(6).divide(20));
-		qBottomLayout.maxHeightProperty().bind(scene.heightProperty().multiply(13).divide(20));
-		answerPane.maxHeightProperty().bind(scene.heightProperty().multiply(13).divide(20));
+		scene = new Scene(root, width, height);
+		applyBindings();
 		scene.getStylesheets().add("css/style.css");
 		positionPane();
 	}
 
+	private void handleAnswerSelection(String choice) {
+		// Assign choice to player 1 (assuming 1-player mode for clicks)
+		Player.fPlayerAns = choice;
+
+		// Update UI feedback (Changing player icon to confirm state)
+		if (playerSlot[0] != null) {
+			playerSlot[0].setImage(UiConstant.firstPlayerConfirm);
+		}
+
+		// Disable further clicks to prevent double-firing
+		answersVBox.setDisable(true);
+
+		// Trigger next question (mimicking the actionButton.fire() from serial)
+		actionButton.fire();
+	}
+
+	private void applyBindings() {
+		questionPane.prefWidthProperty().bind(scene.widthProperty().multiply(0.6));
+		answerPane.prefWidthProperty().bind(scene.widthProperty().multiply(0.4));
+		qUpperLayout.prefHeightProperty().bind(scene.heightProperty().multiply(0.25));
+		qBottomLayout.prefHeightProperty().bind(scene.heightProperty().multiply(0.75));
+		textFlow.prefWidthProperty().bind(questionPane.widthProperty().multiply(0.8));
+	}
+
+	private void positionPane() {
+		StackPane.setAlignment(homeButton, Pos.BOTTOM_LEFT);
+		StackPane.setMargin(homeButton, new Insets(30));
+		StackPane.setAlignment(qUpperLayout, Pos.TOP_CENTER);
+		StackPane.setAlignment(qBottomLayout, Pos.CENTER);
+	}
+
+	private TextFlow createTextFlow(String text) {
+		TextFlow flow = new TextFlow();
+		if (text == null) return flow;
+		Pattern englishPattern = Pattern.compile("[A-Za-z]");
+		String[] parts = text.split("(?=[A-Za-z])|(?<=[A-Za-z])");
+		for (String part : parts) {
+			Text t = new Text(part);
+			t.setFont(englishPattern.matcher(part).find() ? englishFont : burmeseFont);
+			flow.getChildren().add(t);
+		}
+		return flow;
+	}
+
 	public void nextQuestion() {
-		checkPlayerMark();
 		questionPointer++;
-		if (questionPointer == totalQuestion) {
-			serialService.stopService();
+		if (questionPointer >= totalQuestion || questionPointer >= questionArray.size()) {
+			if (Player.rightAns.equalsIgnoreCase(Player.fPlayerAns)) {
+				soundService.playSfx("correct");
+			}else{
+				soundService.playSfx("wrong");
+			}
 			sceneManager.switchToResult();
 		} else {
-			serialService.stopService();
-			transitionState.showTransitionState("နောက်မေးခွန်းလာပါတော့မယ်", root, false);
+			if (Player.rightAns.equalsIgnoreCase(Player.fPlayerAns)) {
+				soundService.playSfx("correct");
+				Player.fPlayerMark++; // Reward player
+				transitionState.showTransitionState("မှန်ကန်ပါတယ်!", root, false, true);
+			} else {
+				soundService.playSfx("wrong");
+				transitionState.showTransitionState("မှားယွင်းနေပါတယ်!", root, false, false);
+			}
 		}
 	}
 
 	private void checkPlayerMark() {
-		System.out.println("First player answer : " + Player.fPlayerAns);
-		System.out.println("Second player answer : " + Player.sPlayerAns);
-		System.out.println("Third player answer : " + Player.tPlayerAns);
-		System.out.println("Right answer : " + Player.rightAns);
-		System.out.println("----------------------");
-		if (Player.rightAns.equals(Player.fPlayerAns)) {
-			Player.fPlayerMark++;
-		}
-		if (Player.rightAns.equals(Player.sPlayerAns)) {
-			Player.sPlayerMark++;
-		}
-		if (Player.rightAns.equals(Player.tPlayerAns)) {
-			Player.tPlayerMark++;
-		}
-		System.out.println("----------------------");
-		System.out.println("Question " + questionPointer + " out of " + totalQuestion);
-		System.out.println("first Current mark : " + Player.fPlayerMark);
-		System.out.println("second Current mark : " + Player.sPlayerMark);
-		System.out.println("third Current mark : " + Player.tPlayerMark);
-		System.out.println("----------------------");
+		// Logic based on your old mark tracking
+		if (Player.rightAns.equalsIgnoreCase(Player.fPlayerAns)) Player.fPlayerMark++;
+		if (Player.rightAns.equalsIgnoreCase(Player.sPlayerAns)) Player.sPlayerMark++;
+		if (Player.rightAns.equalsIgnoreCase(Player.tPlayerAns)) Player.tPlayerMark++;
 	}
 
 	private void switchBackToHome() {
+		soundService.playSfx("click");
+		playerManager.abandonSession();
 		sceneManager.switchToHome(true);
 		questionPointer = 0;
 		Player.resetPlayerMark();
-		serialService.sendMessage("");
-		serialService.stopService();
 	}
 
-	private void positionPane() {
-		hBox.setAlignment(Pos.BOTTOM_CENTER);
-		StackPane.setAlignment(textFlow, Pos.TOP_CENTER);
-		StackPane.setAlignment(qUpperLayout, Pos.TOP_CENTER);
-		StackPane.setAlignment(qBottomLayout, Pos.BOTTOM_CENTER);
-		StackPane.setAlignment(questionPane, Pos.CENTER_LEFT);
-		StackPane.setAlignment(answerPane, Pos.BOTTOM_RIGHT);
-	}
-
-	private TextFlow createTextFlow(String text) {
-		TextFlow textFlow = new TextFlow();
-		textFlow.setMaxSize(text.length() + 200, text.length());
-		// Define regex patterns for detecting English and Burmese text
-		Pattern englishPattern = Pattern.compile("[A-Za-z]");
-
-		// Split the input text into parts
-		String[] parts = text.split("(?=[A-Za-z])|(?<=[A-Za-z])"); // Regex splits at word boundaries
-
-		for (String part : parts) {
-			Text textPart = new Text(part);
-
-			// If the part contains English letters, set the font to Arial
-			if (englishPattern.matcher(part).find()) {
-				textPart.setFont(englishFont);
-			} else {
-				// Otherwise, set the font to the Burmese font
-				textPart.setFont(burmeseFont);
-			}
-
-			// Add the text part to TextFlow
-			textFlow.getChildren().add(textPart);
-		}
-
-		return textFlow;
-	}
-
-	public Scene getScene() {
-		return scene;
-	}
+	public static ImageView[] playerSlot = new ImageView[3];
+	public Scene getScene() { return scene; }
 }

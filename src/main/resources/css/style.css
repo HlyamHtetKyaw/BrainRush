@@ -15,23 +15,41 @@
 }
 
 .question_text_flow {
-	-fx-background-color: white;
-	-fx-background-radius: 20;
-	-fx-padding: 10;
-	-fx-text-wrap: true;
-	-fx-text-alignment: center;
+    -fx-background-color: white;
+    -fx-background-radius: 40; /* Curvier looks more modern */
+    -fx-padding: 30;           /* More internal space for the text */
+    -fx-text-alignment: center;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 10, 0, 0, 5);
 }
 
 .ABC {
-	-fx-background-color: white;
-	-fx-background-radius: 50;
-	-fx-font-weight: bold;
+    -fx-background-color: white;
+    -fx-background-radius: 100; /* Perfect circle */
+    -fx-font-weight: bold;
+    -fx-font-size: 22px;
+    -fx-text-fill: #333;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.2), 5, 0, 0, 2);
 }
 
 .answer {
-	-fx-background-color: white;
-	-fx-background-radius: 30;
-	-fx-text-wrap: true;
-	-fx-text-alignment: center;
-	-fx-padding: 10 0 0 0;
+    -fx-background-color: white;
+    -fx-background-radius: 40;
+    -fx-text-alignment: center;
+    -fx-padding: 15 20 15 20; /* Equal padding for vertical centering */
+    -fx-min-height: 60;       /* Ensures it matches the height of the ABC circles */
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.1), 5, 0, 0, 2);
+}
+.answer_row:hover {
+    -fx-scale-x: 1.05;
+    -fx-scale-y: 1.05;
+    -fx-cursor: hand;
+}
+
+.answer_row:pressed {
+    -fx-scale-x: 0.98;
+    -fx-scale-y: 0.98;
+}
+
+.answer, .ABC {
+    -fx-mouse-transparent: true;
 }
